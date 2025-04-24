@@ -12,6 +12,16 @@ SUBSCRIPTION_TIERS = {
 
 async def get_account_subscription(client, account_id: str) -> Optional[Dict]:
     """Get the current subscription for an account."""
+
+    # ✅ Bypass totale se in modalità self-hosted
+    if config.ENV_MODE == EnvMode.SELF_HOSTED:
+        return {
+            'price_id': 'selfhosted',
+            'plan_name': 'Self Hosted',
+            'minutes': 999999,
+            'status': 'active'
+        }
+
     result = await client.schema('basejump').from_('billing_subscriptions') \
         .select('*') \
         .eq('account_id', account_id) \
@@ -81,10 +91,16 @@ async def check_billing_status(client, account_id: str) -> Tuple[bool, str, Opti
             "plan_name": "Local Development",
             "minutes_limit": "no limit"
         }
+
+    if config.ENV_MODE == EnvMode.SELF_HOSTED:
+        logger.info("Running in self-hosted mode - billing checks are bypassed")
+        return True, "Self-hosted mode - billing disabled", {
+            "price_id": "selfhosted",
+            "plan_name": "Self Hosted",
+            "minutes_limit": "no limit"
+        }
     
     # For staging/production, check subscription status
-    
-    # Get current subscription
     subscription = await get_account_subscription(client, account_id)
     
     # If no subscription, they can use free tier
